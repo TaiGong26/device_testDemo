@@ -15,7 +15,6 @@ import time
 class ArmController(BaseController):
     def __init__(self, ws_url:str, local_port:int=0, enable_kcp:bool=False, crl_hz:int=500, device_id:int=0):
         super().__init__(ws_url, local_port, enable_kcp, crl_hz, device_id)
-        # self._coordinator = None # Coordinator
         
         self._hex_api = None
         self._task_thread = None
@@ -36,17 +35,20 @@ class ArmController(BaseController):
             enable_kcp=self._enable_kcp, 
             )
         
-        # self._task_thread = threading.Thread(target=self._task_loop)
-        # self._task_thread.start()
+        self._task_thread = threading.Thread(target=self._task_loop)
+        self._task_thread.start()
         
         # add wait for device list to be updated
         while not self._hex_api.device_list:
             time.sleep(0.1)
         
         for device in self._hex_api.device_list:
-            print(f"[Device {self._device_id}] 发现设备: {device} type: {type(device)}")
+            # print(f"[Device {self._device_id}] 发现设备: {device} type: {type(device)}")
             if isinstance(device, Arm):
                 self.device = device
+                if device.robot_type:
+                    self.robot_type = device.robot_type
+                    # print(f"[Device {self._device_id}] 设备类型: {self.robot_type}")
                 break
         if self.device is None:
             print("device is None")
@@ -55,9 +57,12 @@ class ArmController(BaseController):
         return True
    
     def shutdown(self):
-        self._task_thread.join(timeout=2)
+        if self._task_thread:
+            if self._task_thread.is_alive():
+                self._task_thread.join(timeout=0.1)
         self._task_thread = None
-        self._hex_api.close()
+        if self._hex_api:
+            self._hex_api.close()
         self._hex_api = None
     
     def set_coordinator(self, _send_barrier, _complete_action_barrier):
@@ -81,15 +86,21 @@ class ArmController(BaseController):
                 
                 
                 # waiting for coordinator sync
-                if self._send_barrier:
-                    self._send_barrier.wait()
+                # if self._send_barrier:
+                #     self._send_barrier.wait()
                 
                 # this controller send command or send message
-                
+                self.send_command()
+                # if self._complete_action_barrier:
+                #     self._complete_action_barrier.wait()
                 
                 # update info
                 
-                pass
+                
+                # ============= test ===========
+                print(f"[Device {self._device_id}] 电机位置: {self.device.get_motor_positions()}")
+                
+                time.sleep(0.001)
         
         except Exception as e:
             print(f"[Device {self._device_id}] 线程异常崩溃: {e}")
@@ -97,20 +108,19 @@ class ArmController(BaseController):
         finally:
             print(f"[Device {self._device_id}] 任务线程退出")
         
-    def send_command(self):
+    def send_command(self) -> bool:
         
         if self._send_barrier is None or self._complete_action_barrier is None:
             raise ValueError("coordinator is None")
             
         cmd = None
-        if self._cmd_queue:
-            cmd = self._cmd_queue.popleft()
+        if self._cmd_queue and self._cmd_queue.empty():
+            cmd = self._cmd_queue.get()
+            # raise ValueError(f"[Device {self._device_id}] cmd queue is empty")
         
-        if cmd is None:
-            return
         # loop condition
-        
-        self._send_barrier.wait()
+        if self._send_barrier:
+            self._send_barrier.wait()
         # send command
         self.device.motor_command( # device inner have a lock
             CommandType.POSITION,
@@ -118,11 +128,12 @@ class ArmController(BaseController):
         )
         
         # wait for complete action
-        self._complete_action_barrier.wait()
-
-    def all_brake(self):
-        pass
-    
+        if self._complete_action_barrier:
+            self._complete_action_barrier.wait()
+        
+        if cmd is None:
+            return False
+        return True
 
 def main():
     pass

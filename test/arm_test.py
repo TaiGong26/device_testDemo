@@ -2,7 +2,8 @@ import argparse
 import traceback
 import threading
 import signal
-
+import time
+import sys
 
 from hex_device_testDemo.managers.Coordinator import Coordinator
 
@@ -12,13 +13,14 @@ from hex_device_testDemo.managers.Coordinator import Coordinator
 # clean up
 def cleanup(coordinator):
     coordinator.shutdown()
-    print("[Cleanup] shutdown")
+    coordinator._stop_event.wait()
 
 # 信号处理回调
-def signal_handler(signal, frame, stop_event: threading.Event, coordinator):
-    cleanup(coordinator)
+def signal_handler(signal, frame, stop_event: threading.Event):
     print(f"[Signal] {signal} received, exit")
     stop_event.set()
+    
+    return
 
 def main():
     # 标准库中获取命令行参数：数组
@@ -48,27 +50,49 @@ def main():
     enable_kcp = args.KCP
         
     stop_event = threading.Event()
-    
+    coordinator = None
     try:
         coordinator = Coordinator(dev_ip_list, enable_kcp)
         
         # 信号处理
-        signal.signal(signal.SIGINT, lambda signal, frame: signal_handler(signal, frame, stop_event, coordinator))
-        signal.signal(signal.SIGTERM, lambda signal, frame: signal_handler(signal, frame, stop_event, coordinator))
+        signal.signal(signal.SIGINT, lambda signal, frame: signal_handler(signal, frame, stop_event))
+        signal.signal(signal.SIGTERM, lambda signal, frame: signal_handler(signal, frame, stop_event))
         
-        stop_event.wait()
+        # publish a command
+        time.sleep(1)
+        coordinator.publish_command([0, 0, 0, 0, 0, 0])
+        print(f"publish command: {0, 0, 0, 0, 0, 0}")
+        
+        stop_event.wait()   
+        # if coordinator is not None:
+        #     cleanup(coordinator)
     except KeyboardInterrupt:
         print("keyboard interrupt")
         
     except Exception as e:
         print(f"main error: {e}")
         traceback.print_exc()
-    
-def test():
-    dic = {}
-    
-    print(dic.get("url"))
+    finally:
+        # 恢复默认信号处理
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
         
+        if coordinator is not None:
+            cleanup(coordinator)
+        print("[finally] you can try a gain ctrl c to exit the terminal")
+        sys.exit(0)
+
+def r():
+    raise ValueError("devic 0: test error")
+
+def test():
+    # dic = {}
+    
+    # print(dic.get("url"))
+    try:
+        r()
+    except ValueError as e:
+        print(e)
     
         
 if __name__ == "__main__":

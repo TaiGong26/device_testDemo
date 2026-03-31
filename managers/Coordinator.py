@@ -50,7 +50,6 @@ class Coordinator(BaseCoordinator):
     
     
     def shutdown(self):
-        self._stop_event.set()
         
         # controllers stop
         with self.controller_lock:
@@ -58,9 +57,11 @@ class Coordinator(BaseCoordinator):
                 controller.shutdown()
             
         # coordinator thread stop
-        self._coordinator_monitor_loop.join(timeout=2)
-        self._coordinator_monitor_loop = None
+        if self._coordinator_monitor_loop:
+            self._coordinator_monitor_loop.join(timeout=0.1)
+            self._coordinator_monitor_loop = None
         
+        self._stop_event.set()
         
     def _monitor_loop(self):
         
@@ -75,23 +76,34 @@ class Coordinator(BaseCoordinator):
     
     
     # ============ command ==============
-    def publish_command(self,cmd):
+    def publish_command(self,cmd:Optional[list[float]] = None):
         try:
             
             with self.controller_lock:
                 for controller in self._controllers_list:
-                    controller.put_command(cmd)
-                    
+                    isok = controller.put_command(cmd)
+                    if isok == False:
+                        print(f"[Coordinator] device {controller.get_device_id()} put command failed")
+            
+            
             # wait for controllers to finish
             if self._send_barrier:
                 self._send_barrier.wait()
-                print("all controllers execute command")
+                print("======================= all controllers execute command ============================")
+                
+                
+            # for controller in self._controllers_list:
+            #     is_ok = controller.send_command(cmd)
+            #     if not is_ok:
+            #         print(f"[Coordinator] device {controller.get_device_id()} send command failed")
                 
             # wait for controllers to finish
             if self._complete_action_barrier:
                 self._complete_action_barrier.wait()
-                print("all controllers complete action")
+                print("======================= all controllers complete action ============================")
                 
+        except ValueError as e:
+            print(e)
         except Exception as e:
             print(e)
     

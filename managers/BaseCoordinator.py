@@ -3,8 +3,12 @@ import asyncio
 from typing import Optional, List
 import threading
 from collections import deque
+from dataclasses import dataclass
+
+
 
 # 控制器状态机
+@dataclass
 class CoordinatorStatus:
     NoneStatus = 0
     Init = 1
@@ -13,6 +17,38 @@ class CoordinatorStatus:
     Stopped = 4
     Error = 5
     Exit = 6
+
+# 状态机类
+class StateMachine:
+    
+    def __init__(self):
+        self._status = CoordinatorStatus.NoneStatus
+        self._status_machine_lock = threading.Lock()
+        
+    # next status
+    def set_next_status(self):
+        with self._status_machine_lock:
+            self._status = self._status + 1
+        
+    # Error status
+    def set_error_status(self):
+        with self._status_machine_lock:
+            self._status = CoordinatorStatus.Error
+        
+    # Exit status
+    def set_exit_status(self):
+        with self._status_machine_lock:
+            self._status = CoordinatorStatus.Exit
+    
+    # Ready status
+    def set_ready_status(self):
+        with self._status_machine_lock:
+            self._status = CoordinatorStatus.Ready
+        
+    def get_current_status(self):
+        with self._status_machine_lock:
+            return self._status
+        
 
 class BaseCoordinator(ABC):
     def __init__(self):
@@ -25,6 +61,8 @@ class BaseCoordinator(ABC):
         self._complete_action_barrier:Optional[threading.Barrier] = None
         
         self._controllers_list = deque()
+        
+        self._state_machine = CoordinatorStatus.NoneStatus
     
     @abstractmethod
     def start(self):

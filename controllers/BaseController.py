@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 import asyncio
 from typing import Optional, List
 import threading
-from collections import deque
-
+# from collections import deque
+from queue import Queue
 # 控制器状态机
 class ControllerStatus:
     Disconnected = 0
@@ -27,12 +27,15 @@ class BaseController(ABC):
         self._crl_hz = crl_hz
         self._device_id = device_id
         
+        self.robot_type =None
+        
         self._status_lock = threading.Lock()
         self._data_lock = threading.Lock()
 
         # data 
-        self.info = {}
-        self._cmd_queue = deque()
+        self.controll_info = {}
+        self.device_info = {}
+        self._cmd_queue = Queue()
         
         # self.status = ControllerStatus.Disconnected
         self._send_barrier:Optional[threading.Barrier] = None
@@ -55,15 +58,14 @@ class BaseController(ABC):
     def shutdown(self):
         pass
     
-    @abstractmethod
-    def all_brake(self):
-        pass
-    
-    def put_command(self, cmd):
-        self._cmd_queue.append(cmd)
+    def put_command(self, cmd:Optional[list[float]] = None) -> bool:
+        if self._cmd_queue.full():
+            return False
+        self._cmd_queue.put(cmd)
+        return True
         
     @abstractmethod
-    def send_command(self):
+    def send_command(self) -> bool:
         pass
     
     @abstractmethod
@@ -81,6 +83,18 @@ class BaseController(ABC):
     @abstractmethod
     def get_status(self):
         pass
+    
+    def get_device_id(self):
+        with self._status_lock:
+            return self._device_id
+        
+    def get_controll_info(self):
+        with self._status_lock:
+            return self.controll_info
+    
+    def get_device_info(self):
+        with self._status_lock:
+            return self.device_info
     
     @abstractmethod
     def _task_loop(self):
