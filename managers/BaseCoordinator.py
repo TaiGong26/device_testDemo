@@ -15,17 +15,16 @@ class CoordinatorStatus:
     Exit = 6
 
 class BaseCoordinator(ABC):
-    
-    def __init__(self, device_ip_list: Optional[List[str]] = None):
+    def __init__(self):
         # self._async_loop = None
-        self._device_ip_list = device_ip_list
+        # self._device_ws_url_list = _device_ws_url_list
         
         self._stop_event = threading.Event()
         self.controller_lock = threading.Lock()
         self._send_barrier:Optional[threading.Barrier] = None
         self._complete_action_barrier:Optional[threading.Barrier] = None
         
-        self._controllers = deque()
+        self._controllers_list = deque()
     
     @abstractmethod
     def start(self):

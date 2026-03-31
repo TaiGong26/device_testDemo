@@ -6,41 +6,43 @@ from ..controllers.ArmController import ArmController as Controller
 
 class Coordinator(BaseCoordinator):
     
-    def __init__(self, device_ip_list: Optional[List[dict]] = None):
-        super().__init__(device_ip_list)
+    def __init__(self, device_ws_url_list: Optional[List[dict]] = None, enable_kcp: bool = False):
+        super().__init__()
         
         self._coordinator_monitor_loop = None
+        self._enable_kcp = enable_kcp
         
+        
+        self.start(device_ws_url_list, enable_kcp)
     
-    def start(self):
-        if self._device_ip_list is None:
+    def start(self, device_ws_url_list, enable_kcp):
+        if device_ws_url_list is None:
             print("device ip list is None")
             return False
         
         # create controllers
-        for ip in self._device_ip_list:
-            
+        for idx, ip in enumerate(device_ws_url_list):
             controller = Controller(
-                ws_url=ip["ws_url"],
-                local_port=ip["local_port"],
-                enable_kcp=ip["enable_kcp"],
-                crl_hz=ip["crl_hz"],
-                device_id=ip["device_id"]
+                ws_url=ip,
+                local_port=0,
+                enable_kcp=enable_kcp,
+                crl_hz=500,
+                device_id=idx
             )
-            self._controllers.append(controller)
+            self._controllers_list.append(controller)
         
         # event init
-        self._send_barrier = threading.Barrier(len(self._device_ip_list)+1)
-        self._complete_action_barrier = threading.Barrier(len(self._device_ip_list)+1)
+        print(f"controllers {len(self._controllers_list)}")
+        self._send_barrier = threading.Barrier(len(self._controllers_list)+1)
+        self._complete_action_barrier = threading.Barrier(len(self._controllers_list)+1)
         
         # set coordinator to controllers
-        for controller in self._controllers:
+        for controller in self._controllers_list:
             controller.set_coordinator(self._send_barrier, self._complete_action_barrier)
         
         # controllers start
-        for controller in self._controllers:
+        for controller in self._controllers_list:
             controller.start()
-        
         
         # # # coordinator thread start
         # self._coordinator_monitor_loop: threading.Thread = threading.Thread(target=self._monitor_loop)
@@ -52,7 +54,7 @@ class Coordinator(BaseCoordinator):
         
         # controllers stop
         with self.controller_lock:
-            for controller in self._controllers:
+            for controller in self._controllers_list:
                 controller.shutdown()
             
         # coordinator thread stop
@@ -63,7 +65,7 @@ class Coordinator(BaseCoordinator):
     def _monitor_loop(self):
         
         while not self._stop_event.is_set():
-            alive = [c.get_device_id() for c in self._controllers if c.is_alive()]
+            alive = [c.get_device_id() for c in self._controllers_list if c.is_alive()]
             dead  = list(self.get_dead_threads().keys())
  
             if dead:
@@ -77,7 +79,7 @@ class Coordinator(BaseCoordinator):
         try:
             
             with self.controller_lock:
-                for controller in self._controllers:
+                for controller in self._controllers_list:
                     controller.put_command(cmd)
                     
             # wait for controllers to finish

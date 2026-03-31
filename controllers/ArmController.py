@@ -3,6 +3,7 @@ import threading
 from hex_device import Arm, CommandType
 
 from .BaseController import BaseController
+import time
 """
 臂控制器
  - 统一连接
@@ -14,7 +15,7 @@ from .BaseController import BaseController
 class ArmController(BaseController):
     def __init__(self, ws_url:str, local_port:int=0, enable_kcp:bool=False, crl_hz:int=500, device_id:int=0):
         super().__init__(ws_url, local_port, enable_kcp, crl_hz, device_id)
-        self._coordinator = None # Coordinator
+        # self._coordinator = None # Coordinator
         
         self._hex_api = None
         self._task_thread = None
@@ -29,12 +30,21 @@ class ArmController(BaseController):
         #     print("coordinator is None")
         #     return False
         
-        self._hex_api = HexDeviceApi(self._ws_url, self._local_port, self._enable_kcp, self._crl_hz)
+        self._hex_api = HexDeviceApi(
+            ws_url=self._ws_url, 
+            local_port=0, 
+            enable_kcp=self._enable_kcp, 
+            )
         
-        self._task_thread = threading.Thread(target=self._task_loop)
-        self._task_thread.start()
+        # self._task_thread = threading.Thread(target=self._task_loop)
+        # self._task_thread.start()
+        
+        # add wait for device list to be updated
+        while not self._hex_api.device_list:
+            time.sleep(0.1)
         
         for device in self._hex_api.device_list:
+            print(f"[Device {self._device_id}] 发现设备: {device} type: {type(device)}")
             if isinstance(device, Arm):
                 self.device = device
                 break
@@ -71,8 +81,8 @@ class ArmController(BaseController):
                 
                 
                 # waiting for coordinator sync
-                if self._coordinator_task_barrier:
-                    self._coordinator_task_barrier.wait()
+                if self._send_barrier:
+                    self._send_barrier.wait()
                 
                 # this controller send command or send message
                 

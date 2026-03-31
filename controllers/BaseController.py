@@ -39,9 +39,6 @@ class BaseController(ABC):
         self._complete_action_barrier:Optional[threading.Barrier] = None
         self.thread_is_alive = True
         
-        if self._local_port == 0:
-            raise ValueError("local_port must be greater than 0")
-        
         # if self._device_id == 0:
         #     raise ValueError("device_id must be greater than 0")
         
