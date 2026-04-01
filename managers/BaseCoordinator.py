@@ -4,7 +4,7 @@ from typing import Optional, List
 import threading
 from collections import deque
 from dataclasses import dataclass
-
+from queue import Queue
 
 
 # 控制器状态机
@@ -24,6 +24,8 @@ class StateMachine:
     def __init__(self):
         self._status = CoordinatorStatus.NoneStatus
         self._status_machine_lock = threading.Lock()
+        
+        self.cmd_queue = Queue(maxsize=50)
         
     # next status
     def set_next_status(self):

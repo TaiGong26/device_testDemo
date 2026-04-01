@@ -69,7 +69,7 @@ class BaseController(ABC):
         pass
     
     @abstractmethod
-    def set_coordinator(self, barrier: threading.Barrier):
+    def set_barrier(self, barrier: threading.Barrier):
         pass
     
     @abstractmethod

@@ -5,21 +5,23 @@ import signal
 import time
 import sys
 
-from hex_device_testDemo.managers.Coordinator import Coordinator
+from hex_device_testDemo.managers.Coordinator import ArmCoordinator
 
 
 
 
 # clean up
 def cleanup(coordinator):
+    print(f"cleanup")
     coordinator.shutdown()
+    print(f"coordinator shutdown")
     coordinator._stop_event.wait()
 
 # 信号处理回调
 def signal_handler(signal, frame, stop_event: threading.Event):
     print(f"[Signal] {signal} received, exit")
     stop_event.set()
-    
+    print("----------------------------------------signal handler set stop event")
     return
 
 def main():
@@ -52,7 +54,7 @@ def main():
     stop_event = threading.Event()
     coordinator = None
     try:
-        coordinator = Coordinator(dev_ip_list, enable_kcp)
+        coordinator = ArmCoordinator(dev_ip_list, enable_kcp)
         
         # 信号处理
         signal.signal(signal.SIGINT, lambda signal, frame: signal_handler(signal, frame, stop_event))
@@ -60,9 +62,12 @@ def main():
         
         # publish a command
         time.sleep(1)
-        coordinator.publish_command([0, 0, 0, 0, 0, 0])
-        print(f"publish command: {0, 0, 0, 0, 0, 0}")
+        coordinator.publish_command([0.1, 1.0, 0.1, 0.1, 0.1, 0.1])
         
+        time.sleep(2)
+        print("main threading is alive")
+        
+        print(f"coordinator {coordinator}")
         stop_event.wait()   
         # if coordinator is not None:
         #     cleanup(coordinator)

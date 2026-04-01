@@ -4,7 +4,7 @@ import threading
 from .BaseCoordinator import BaseCoordinator
 from ..controllers.ArmController import ArmController as Controller
 
-class Coordinator(BaseCoordinator):
+class ArmCoordinator(BaseCoordinator):
     
     def __init__(self, device_ws_url_list: Optional[List[dict]] = None, enable_kcp: bool = False):
         super().__init__()
@@ -38,7 +38,7 @@ class Coordinator(BaseCoordinator):
         
         # set coordinator to controllers
         for controller in self._controllers_list:
-            controller.set_coordinator(self._send_barrier, self._complete_action_barrier)
+            controller.set_barrier(self._send_barrier, self._complete_action_barrier)
         
         # controllers start
         for controller in self._controllers_list:
@@ -62,6 +62,7 @@ class Coordinator(BaseCoordinator):
             self._coordinator_monitor_loop = None
         
         self._stop_event.set()
+        print("--------------------------------coordinator shutdown")
         
     def _monitor_loop(self):
         
@@ -74,24 +75,56 @@ class Coordinator(BaseCoordinator):
  
             self._stop_event.wait(timeout=1.0)
     
-    
+    def _task_loop(self):
+        
+        cmd = None
+        while not self._stop_event.is_set(): # condition: controllers are running
+            
+            # if self.cmd_queue.empty():
+            cmd = self.cmd_queue.get()
+            
+            if cmd:
+                with self.controller_lock:
+                    for controller in self._controllers_list:
+                        isok = controller.put_command(cmd)
+                        if isok == False:
+                            print(f"[Coordinator] device {controller.get_device_id()} put command failed")
+                
+                # wait for controllers to finish
+                if self._send_barrier:
+                    self._send_barrier.wait()
+                    print("======================= all controllers execute command ============================")
+                
+                # for controller in self._controllers_list:
+                #     is_ok = controller.send_command(cmd)
+                #     if not is_ok:
+                #         print(f"[Coordinator] device {controller.get_device_id()} send command failed")
+                    
+                # wait for controllers to finish
+                if self._complete_action_barrier:
+                    self._complete_action_barrier.wait()
+                    print("======================= all controllers complete action ============================")
+                
+            # time.sleep(0.001)
+
+            # judge status and update status machine. 判断状态并决定是否进行下一次的机械臂变换
+        
     # ============ command ==============
     def publish_command(self,cmd:Optional[list[float]] = None):
         try:
-            
+            # put command to cmd_queue
+            # self.cmd_queue.put(cmd)  
             with self.controller_lock:
                 for controller in self._controllers_list:
                     isok = controller.put_command(cmd)
                     if isok == False:
                         print(f"[Coordinator] device {controller.get_device_id()} put command failed")
             
-            
             # wait for controllers to finish
             if self._send_barrier:
                 self._send_barrier.wait()
                 print("======================= all controllers execute command ============================")
-                
-                
+            
             # for controller in self._controllers_list:
             #     is_ok = controller.send_command(cmd)
             #     if not is_ok:
@@ -101,7 +134,8 @@ class Coordinator(BaseCoordinator):
             if self._complete_action_barrier:
                 self._complete_action_barrier.wait()
                 print("======================= all controllers complete action ============================")
-                
+                          
+            
         except ValueError as e:
             print(e)
         except Exception as e:
