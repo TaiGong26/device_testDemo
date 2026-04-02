@@ -4,17 +4,18 @@ from typing import Optional, List
 import threading
 # from collections import deque
 from queue import Queue
-# 控制器状态机
-class ControllerStatus:
-    Disconnected = 0
-    Init = 1
-    Ready = 2
-    Running = 3
-    Stopped = 4
-    Error = 5
-    Exit = 6
 
+from enum import Enum
 
+class ControllerStatus(Enum):
+    DISCONNETED = 0
+    INIT = 1
+    READY = 2
+    RUNNING = 3
+    HOLD = 4
+    SHOP = 5
+    ERROR = 6
+    
 
 # 继承ABC类
 class BaseController(ABC):
@@ -29,21 +30,25 @@ class BaseController(ABC):
         
         self.robot_type =None
         
+        
         self._status_lock = threading.Lock()
         self._data_lock = threading.Lock()
 
         # data 
         self.controll_info = {}
         self.device_info = {}
-        self._cmd_queue = Queue()
+        # self._cmd_queue = Queue()
         
         # self.status = ControllerStatus.Disconnected
-        self._send_barrier:Optional[threading.Barrier] = None
-        self._complete_action_barrier:Optional[threading.Barrier] = None
+        # self._send_barrier:Optional[threading.Barrier] = None
+        # self._complete_action_barrier:Optional[threading.Barrier] = None
+        # self._send_condition = threading.Condition()
         self.thread_is_alive = True
         
         # if self._device_id == 0:
         #     raise ValueError("device_id must be greater than 0")
+        
+        
         
     
     # @abstractmethod
@@ -64,17 +69,21 @@ class BaseController(ABC):
         self._cmd_queue.put(cmd)
         return True
         
-    @abstractmethod
-    def send_command(self) -> bool:
-        pass
+    # @abstractmethod
+    # def send_command(self) -> bool:
+    #     pass
     
-    @abstractmethod
-    def set_barrier(self, barrier: threading.Barrier):
-        pass
+    # def set_barrier(self, barrier: threading.Barrier, complete_action_barrier: threading.Barrier):
+    #     self._send_barrier = barrier
+    #     self._complete_action_barrier = complete_action_barrier
+
     
-    @abstractmethod
-    def get_info(self):
-        pass
+    # def set_condition(self, condition: threading.Condition):
+    #     self._send_condition = condition
+    
+    # @abstractmethod
+    # def get_info(self):
+    #     pass
     
     @abstractmethod
     def get_thread_is_alive(self):

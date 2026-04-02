@@ -4,18 +4,20 @@ import threading
 from .BaseCoordinator import BaseCoordinator
 from ..controllers.ArmController import ArmController as Controller
 
+import time
+
 class ArmCoordinator(BaseCoordinator):
     
-    def __init__(self, device_ws_url_list: Optional[List[dict]] = None, enable_kcp: bool = False):
+    def __init__(self, device_ws_url_list: Optional[List[dict]] = None, enable_kcp: bool = False, arm_config: Optional[dict] = None, waypoints: Optional[List[dict]] = None):
         super().__init__()
         
         self._coordinator_monitor_loop = None
         self._enable_kcp = enable_kcp
+        self._waypoints = waypoints
         
-        
-        self.start(device_ws_url_list, enable_kcp)
+        self.start(device_ws_url_list, enable_kcp, arm_config)
     
-    def start(self, device_ws_url_list, enable_kcp):
+    def start(self, device_ws_url_list, enable_kcp, arm_config):
         if device_ws_url_list is None:
             print("device ip list is None")
             return False
@@ -36,10 +38,11 @@ class ArmCoordinator(BaseCoordinator):
         self._send_barrier = threading.Barrier(len(self._controllers_list)+1)
         self._complete_action_barrier = threading.Barrier(len(self._controllers_list)+1)
         
-        # set coordinator to controllers
+        # setting controllers
         for controller in self._controllers_list:
-            controller.set_barrier(self._send_barrier, self._complete_action_barrier)
-        
+            controller.set_arm_config(arm_config)
+            controller.set_waypoints(self._waypoints)
+            
         # controllers start
         for controller in self._controllers_list:
             controller.start()
@@ -60,10 +63,15 @@ class ArmCoordinator(BaseCoordinator):
         if self._coordinator_monitor_loop:
             self._coordinator_monitor_loop.join(timeout=0.1)
             self._coordinator_monitor_loop = None
+            
+        # barrier break
+        self._send_barrier.abort()
+        self._complete_action_barrier.abort()
+        
         
         self._stop_event.set()
         print("--------------------------------coordinator shutdown")
-        
+
     def _monitor_loop(self):
         
         while not self._stop_event.is_set():
@@ -112,29 +120,7 @@ class ArmCoordinator(BaseCoordinator):
     # ============ command ==============
     def publish_command(self,cmd:Optional[list[float]] = None):
         try:
-            # put command to cmd_queue
-            # self.cmd_queue.put(cmd)  
-            with self.controller_lock:
-                for controller in self._controllers_list:
-                    isok = controller.put_command(cmd)
-                    if isok == False:
-                        print(f"[Coordinator] device {controller.get_device_id()} put command failed")
-            
-            # wait for controllers to finish
-            if self._send_barrier:
-                self._send_barrier.wait()
-                print("======================= all controllers execute command ============================")
-            
-            # for controller in self._controllers_list:
-            #     is_ok = controller.send_command(cmd)
-            #     if not is_ok:
-            #         print(f"[Coordinator] device {controller.get_device_id()} send command failed")
-                
-            # wait for controllers to finish
-            if self._complete_action_barrier:
-                self._complete_action_barrier.wait()
-                print("======================= all controllers complete action ============================")
-                          
+            pass
             
         except ValueError as e:
             print(e)

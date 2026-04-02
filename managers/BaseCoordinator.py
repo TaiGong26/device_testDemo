@@ -59,8 +59,9 @@ class BaseCoordinator(ABC):
         
         self._stop_event = threading.Event()
         self.controller_lock = threading.Lock()
-        self._send_barrier:Optional[threading.Barrier] = None
-        self._complete_action_barrier:Optional[threading.Barrier] = None
+        # self._send_barrier:Optional[threading.Barrier] = None
+        # self._complete_action_barrier:Optional[threading.Barrier] = None
+        self._send_condition = threading.Condition()
         
         self._controllers_list = deque()
         

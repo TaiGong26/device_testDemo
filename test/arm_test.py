@@ -50,22 +50,57 @@ def main():
     args = parser.parse_args()
     dev_ip_list = list(args.url.split(','))
     enable_kcp = args.KCP
+    
+    # config
+    config_dict = {
+        'name':'Archer_d6y',
+        'dof_num': 'six_axis',
+        'motor_model': [0x80] * 6,
+        'joints': [{
+            'joint_name': 'joint_1',
+            'joint_limit': [-2.7, 2.7, -0.1, 0.1, 0.0, 0.0]
+        }, {
+            'joint_name': 'joint_2',
+            'joint_limit': [-1.57, 2.094, -0.5, 0.5, 0.0, 0.0]
+        }, {
+            'joint_name': 'joint_3',
+            'joint_limit': [0.0, 3.14159265359, -0.5, 0.5, 0.0, 0.0]
+        }, {
+            'joint_name': 'joint_4',
+            'joint_limit': [-1.5, 1.5, -0.5, 0.5, 0.0, 0.0]
+        }, {
+            'joint_name': 'joint_5',
+            'joint_limit': [-1.56, 1.56, -0.5, 0.5, 0.0, 0.0]
+        }, {
+            'joint_name': 'joint_6',
+            'joint_limit': [-1.57, 1.57, -0.5, 0.5, 0.0, 0.0]
+        }]
+    }
+    
+    arm_position = [
+        [0.0, 0.223598775598, 0.0, 0.0, 0.0, 0.0],
+        [0.5, 0.623598775598, 1.59439265359, 1.57, -1.0472, 0.0],
+        [0.0, 0.223598775598, 0.0, 0.0, 0.0, 0.0],
+        [-0.5, 0.623598775598, 1.59439265359, -1.57, 1.0472, 0.0]
+    ]
         
     stop_event = threading.Event()
     coordinator = None
     try:
-        coordinator = ArmCoordinator(dev_ip_list, enable_kcp)
+        coordinator = ArmCoordinator(
+            dev_ip_list, 
+            enable_kcp, 
+            arm_config=config_dict,
+            waypoints=arm_position
+        )
         
         # 信号处理
         signal.signal(signal.SIGINT, lambda signal, frame: signal_handler(signal, frame, stop_event))
         signal.signal(signal.SIGTERM, lambda signal, frame: signal_handler(signal, frame, stop_event))
         
         # publish a command
-        time.sleep(1)
-        coordinator.publish_command([0.1, 1.0, 0.1, 0.1, 0.1, 0.1])
-        
-        time.sleep(2)
-        print("main threading is alive")
+
+        # coordinator.start()
         
         print(f"coordinator {coordinator}")
         stop_event.wait()   
@@ -87,19 +122,6 @@ def main():
         print("[finally] you can try a gain ctrl c to exit the terminal")
         sys.exit(0)
 
-def r():
-    raise ValueError("devic 0: test error")
-
-def test():
-    # dic = {}
-    
-    # print(dic.get("url"))
-    try:
-        r()
-    except ValueError as e:
-        print(e)
-    
         
 if __name__ == "__main__":
     main()
-    # test()
